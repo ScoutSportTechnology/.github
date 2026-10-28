@@ -154,7 +154,7 @@ git -C "$r" switch -q development; commit "$r" "feat: next"
 expect_eq "floor: open 0.1.0 -> v0.2.0-alpha.1" "$(run "$r" alpha)" "v0.2.0-alpha.1"
 
 # rc tags also mark the release as open.
-r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-rc.1; commit "$r" "fix: b"
+r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-rc.1; git -C "$r" branch release/0.1.0; commit "$r" "fix: b"
 expect_eq "floor: rc-only open release -> v0.2.0-alpha.1" "$(run "$r" alpha)" "v0.2.0-alpha.1"
 
 # Once v0.1.0 ships, the floor disappears and the bump is from stable.
@@ -164,17 +164,37 @@ expect_eq "floor: shipped release ignored -> v0.1.1-alpha.1" "$(run "$r" alpha)"
 
 # A bigger Conventional-Commit bump wins over the floor.
 r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v1.0.0; commit "$r" "feat: b"; tag "$r" v1.1.0-beta.1
+git -C "$r" branch release/1.1.0
 commit "$r" "feat!: big"
 expect_eq "floor: major bump beats floor -> v2.0.0-alpha.1" "$(run "$r" alpha)" "v2.0.0-alpha.1"
 
 # The floor follows the highest open release.
 r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v1.0.0; tag "$r" v1.1.0-beta.4; tag "$r" v1.2.0-beta.1
+git -C "$r" branch release/1.1.0; git -C "$r" branch release/1.2.0
 commit "$r" "fix: c"
 expect_eq "floor: two open releases -> v1.3.0-alpha.1" "$(run "$r" alpha)" "v1.3.0-alpha.1"
 
 # Existing alphas of the floor base continue their counter.
-r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-beta.1; tag "$r" v0.2.0-alpha.4; commit "$r" "feat: b"
+r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-beta.1; tag "$r" v0.2.0-alpha.4
+git -C "$r" branch release/0.1.0; commit "$r" "feat: b"
 expect_eq "floor: continues alpha counter -> v0.2.0-alpha.5" "$(run "$r" alpha)" "v0.2.0-alpha.5"
+
+# An abandoned cut (betas, no stable, release branch deleted) raises no floor:
+# development keeps building 0.1.0 and continues its own alpha counter.
+r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-alpha.4
+git -C "$r" switch -q -c release/0.1.0; commit "$r" "fix: rb"; tag "$r" v0.1.0-beta.27
+git -C "$r" switch -q development; git -C "$r" merge -q --no-ff -m "chore: sync release/0.1.0" release/0.1.0
+git -C "$r" branch -q -D release/0.1.0; commit "$r" "feat: next"
+expect_eq "floor: deleted release branch -> v0.1.0-alpha.5" "$(run "$r" alpha)" "v0.1.0-alpha.5"
+
+# The branch may exist only on origin (CI checkout with fetch-depth: 0).
+r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-beta.2
+git -C "$r" update-ref refs/remotes/origin/release/0.1.0 HEAD; commit "$r" "feat: b"
+expect_eq "floor: origin/release branch counts -> v0.2.0-alpha.1" "$(run "$r" alpha)" "v0.2.0-alpha.1"
+
+# Re-cutting the abandoned version continues its beta counter.
+r="$(new_repo)"; commit "$r" "feat: a"; tag "$r" v0.1.0-beta.27; commit "$r" "feat: b"
+expect_eq "re-cut after abandon -> beta.28" "$(run "$r" release 0.1.0)" "v0.1.0-beta.28"
 
 # ------------------------------------------------------------------ release mode
 r="$(new_repo)"; commit "$r" "feat: a"

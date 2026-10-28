@@ -12,7 +12,7 @@ promotion live here.
 | `actions/publish-release` | Creates the Release (draft → upload assets → publish) and records each asset's SHA-256 in the notes. |
 | `actions/promote` | beta → rc.1, or rc → stable. Same bytes, verified against the recorded SHA-256, renamed to the new tag. No rebuild. |
 
-Callers pin an exact tag of this repo: `ScoutSportTechnology/.github/actions/<name>@v1.0.0`.
+Callers pin an exact tag of this repo: `ScoutSportTechnology/.github/actions/<name>@v1.1.0`.
 The actions share scripts through relative paths, so one pinned tag always
 gives a consistent set.
 
@@ -30,8 +30,11 @@ Levels are tags, not branches.
 Version rules (`resolve-version.sh`):
 
 - **Alpha base** = the higher of (a) the Conventional-Commit bump from the
-  latest stable tag and (b) the release floor: if `X.Y.Z` has beta/rc tags but
-  no stable tag, development builds `X.(Y+1).0`.
+  latest stable tag and (b) the release floor: if `X.Y.Z` is an open release
+  (beta/rc tags, no stable tag, and the `release/X.Y.Z` branch still exists),
+  development builds `X.(Y+1).0`. Deleting a release branch without shipping
+  (an abandoned cut) drops the floor; its prerelease tags stay, and a later
+  `release/X.Y.Z` continues their counters.
 - **Pre-1.0:** a breaking change bumps the minor while the major is 0
   (`v0.1.0` + `feat!:` → `v0.2.0`). `bump: major` is honoured literally and is
   how `1.0.0` is cut.
@@ -61,12 +64,12 @@ All jobs that use these actions need `actions/checkout@v4` with
         with:
           fetch-depth: 0
       - id: ver
-        uses: ScoutSportTechnology/.github/actions/resolve-version@v1.0.0
+        uses: ScoutSportTechnology/.github/actions/resolve-version@v1.1.0
         with:
           mode: alpha
       # ... build the asset(s) here, only if steps.ver.outputs.released == 'true'
       - if: steps.ver.outputs.released == 'true'
-        uses: ScoutSportTechnology/.github/actions/publish-release@v1.0.0
+        uses: ScoutSportTechnology/.github/actions/publish-release@v1.1.0
         with:
           tag: ${{ steps.ver.outputs.tag }}
           files: dist/*.apk          # omit for proto (no assets)
@@ -104,7 +107,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ScoutSportTechnology/.github/actions/promote@v1.0.0
+      - uses: ScoutSportTechnology/.github/actions/promote@v1.1.0
         with:
           to: rc
           version: ${{ inputs.version }}
@@ -135,7 +138,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ScoutSportTechnology/.github/actions/promote@v1.0.0
+      - uses: ScoutSportTechnology/.github/actions/promote@v1.1.0
         with:
           to: stable
           version: ${{ inputs.version }}
