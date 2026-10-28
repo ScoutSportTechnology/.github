@@ -26,10 +26,14 @@
 #        breaking (`type!:`, `type(scope)!:`, BREAKING CHANGE) -> major,
 #        but -> minor while the major is 0 (pre-1.0 rule);
 #        feat -> minor; fix/perf -> patch; anything else -> no release.
-#   B. The "release floor": for the highest X.Y.Z that has beta/rc tags but no
-#      stable tag (an open release), X.(Y+1).0. Once a release is cut,
+#   B. The "release floor": for the highest X.Y.Z that is an OPEN release, i.e.
+#      it has beta/rc tags, no stable tag, and its release/X.Y.Z branch still
+#      exists (local or origin): X.(Y+1).0. While a release is open,
 #      development builds the NEXT version, so its alphas never sort below
-#      the open release's betas.
+#      the open release's betas. A release branch deleted without shipping
+#      (abandoned cut) no longer raises the floor; its prerelease tags stay
+#      as history and a later release/X.Y.Z continues their counters.
+#      Callers must check out with fetch-depth: 0 so origin branches exist.
 #
 # Mint gate (alpha): mint only if a releasable commit landed since the nearest
 # version tag in HEAD's ancestry. Tags on other branches (e.g. betas on the
@@ -134,12 +138,20 @@ apply_bump() { # version bump -> version
   echo "${MA}.${MI}.${PA}"
 }
 
-# Highest X.Y.Z with beta/rc tags and no stable tag -> X.(Y+1).0, else "".
+# A release/X.Y.Z branch exists locally or on origin.
+has_release_branch() {
+  git rev-parse -q --verify "refs/heads/release/$1" >/dev/null 2>&1 \
+    || git rev-parse -q --verify "refs/remotes/origin/release/$1" >/dev/null 2>&1
+}
+
+# Highest open X.Y.Z (beta/rc tags, no stable tag, release branch present)
+# -> X.(Y+1).0, else "".
 release_floor() {
   local b open="" MA MI rest
   while read -r b; do
     [ -z "$b" ] && continue
-    has_stable "$b" || open="$b"
+    has_stable "$b" && continue
+    has_release_branch "$b" && open="$b"
   done < <(git tag -l 'v*' \
     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-(beta|rc)\.[0-9]+$' \
     | sed -E 's/^v([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/' \
