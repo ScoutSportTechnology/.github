@@ -1,0 +1,52 @@
+name: SST promote
+description: >
+  Promote without rebuilding: highest beta -> rc.1 (after the hardware test),
+  or highest rc -> stable (on merge to main). Copies the assets, verifies their
+  recorded SHA-256 and renames them to the new tag. Needs a full-history
+  checkout (actions/checkout with fetch-depth 0).
+
+inputs:
+  to:
+    description: "rc | stable"
+    required: true
+  version:
+    description: "X.Y.Z. rc: defaults to the release/X.Y.Z branch; stable: derived from the merge commit"
+    required: false
+    default: ""
+  assets:
+    description: "Glob of source asset names to carry over, e.g. '*-production.apk'"
+    required: false
+    default: "*"
+  notes:
+    description: "Text above the digest block; {tag} is replaced with the new tag"
+    required: false
+    default: ""
+  github-token:
+    description: "Token with contents: write"
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  tag:
+    description: "The new tag (vX.Y.Z-rc.1 or vX.Y.Z)"
+    value: ${{ steps.promote.outputs.tag }}
+  source:
+    description: "The promoted source tag"
+    value: ${{ steps.promote.outputs.source }}
+  base:
+    description: "X.Y.Z"
+    value: ${{ steps.promote.outputs.base }}
+
+runs:
+  using: composite
+  steps:
+    - id: promote
+      shell: bash
+      env:
+        TO: ${{ inputs.to }}
+        BASE: ${{ inputs.version }}
+        ASSETS: ${{ inputs.assets }}
+        NOTES: ${{ inputs.notes }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        GH_REPO: ${{ github.repository }}
+      run: '"${GITHUB_ACTION_PATH}/promote.sh"'
