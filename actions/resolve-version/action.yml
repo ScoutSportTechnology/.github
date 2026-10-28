@@ -1,0 +1,49 @@
+name: SST resolve version
+description: >
+  Compute the next SemVer tag for the SST release ladder
+  (development -> alpha, release/X.Y.Z -> beta then rc, main -> stable).
+  Needs a full-history checkout (actions/checkout with fetch-depth 0).
+
+inputs:
+  mode:
+    description: "alpha | release | beta | rc | stable"
+    required: true
+  base:
+    description: "X.Y.Z. Optional for release/beta/rc on a release/X.Y.Z branch; required for stable."
+    required: false
+    default: ""
+  version:
+    description: "alpha only: force the base version, e.g. v0.2.0 (IN_VERSION)"
+    required: false
+    default: ""
+  bump:
+    description: "alpha only: force the bump level major|minor|patch (IN_BUMP)"
+    required: false
+    default: ""
+
+outputs:
+  tag:
+    description: "Next tag, e.g. v0.1.0-beta.3 (empty when released is false)"
+    value: ${{ steps.resolve.outputs.tag }}
+  released:
+    description: "true when a new tag should be minted"
+    value: ${{ steps.resolve.outputs.released }}
+  level:
+    description: "alpha | beta | rc | stable"
+    value: ${{ steps.resolve.outputs.level }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        BASE: ${{ inputs.base }}
+        IN_VERSION: ${{ inputs.version }}
+        IN_BUMP: ${{ inputs.bump }}
+      run: |
+        set -euo pipefail
+        args=("$MODE")
+        [ -n "$BASE" ] && args+=("$BASE")
+        "${GITHUB_ACTION_PATH}/resolve-version.sh" "${args[@]}"

@@ -1,0 +1,54 @@
+name: SST publish release
+description: >
+  Create (draft -> upload -> publish) the GitHub Release for a version tag,
+  attach assets and record each asset's SHA-256 in the notes for promotion.
+
+inputs:
+  tag:
+    description: "Version tag, e.g. v0.1.0-beta.3 (usually resolve-version's tag output)"
+    required: true
+  files:
+    description: "Newline-separated asset paths or globs. Empty = no assets (proto)."
+    required: false
+    default: ""
+  prerelease:
+    description: "true for alpha/beta/rc, false for stable"
+    required: false
+    default: "true"
+  notes:
+    description: "Text above the digest block; {tag} is replaced with the tag"
+    required: false
+    default: ""
+  generate-notes:
+    description: "Append GitHub-generated release notes (new releases only)"
+    required: false
+    default: "true"
+  target:
+    description: "Commit SHA the tag points to"
+    required: false
+    default: ${{ github.sha }}
+  github-token:
+    description: "Token with contents: write"
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  tag:
+    description: "The published tag"
+    value: ${{ steps.publish.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - id: publish
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        FILES: ${{ inputs.files }}
+        PRERELEASE: ${{ inputs.prerelease }}
+        NOTES: ${{ inputs.notes }}
+        GENERATE_NOTES: ${{ inputs.generate-notes }}
+        TARGET: ${{ inputs.target }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        GH_REPO: ${{ github.repository }}
+      run: '"${GITHUB_ACTION_PATH}/publish-release.sh"'
